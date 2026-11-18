@@ -1,0 +1,163 @@
+erDiagram
+    direction LR
+
+    USERS ||--o{ SESSIONS : "creates"
+    USERS ||--o| STUDENTS : "has_profile"
+    GROUPS ||--o{ STUDENTS : "includes"
+
+    COURSES ||--o{ COURSE_OFFERINGS : "is_taught_as"
+    GROUPS ||--o{ COURSE_OFFERINGS : "receives"
+    INSTRUCTORS ||--o{ COURSE_OFFERINGS : "teaches"
+    COURSE_OFFERINGS ||--o{ LESSONS : "schedules"
+    LESSONS ||--o{ LESSON_CHANGES : "has_changes"
+
+    STUDENTS ||--o{ ENROLLMENTS : "enrolls"
+    COURSE_OFFERINGS ||--o{ ENROLLMENTS : "accepts"
+    ENROLLMENTS ||--o{ GRADES : "receives"
+    COURSE_OFFERINGS ||--o{ EXAMS : "has_exams"
+
+    REQUEST_TYPES ||--o{ APPLICATIONS : "defines"
+    STUDENTS ||--o{ APPLICATIONS : "submits"
+    APPLICATIONS ||--o{ APPLICATION_EVENTS : "has_history"
+    USERS |o--o{ APPLICATION_EVENTS : "performs_optional"
+    STUDENTS ||--o{ NOTIFICATIONS : "receives"
+
+    USERS {
+        uuid id PK
+        varchar username UK
+        varchar password_hash
+        varchar role
+        boolean active
+        timestamptz created_at
+    }
+
+    SESSIONS {
+        uuid id PK
+        uuid user_id FK
+        varchar token_hash UK
+        varchar csrf_token
+        timestamptz expires_at
+        timestamptz revoked_at
+    }
+
+    LOGIN_ATTEMPTS {
+        varchar key PK
+        timestamptz window PK
+        int count
+    }
+
+    STUDENTS {
+        uuid user_id PK, FK
+        varchar full_name
+        varchar faculty
+        varchar program
+        int course_year
+        uuid group_id FK
+    }
+
+    GROUPS {
+        uuid id PK
+        varchar name UK
+    }
+
+    INSTRUCTORS {
+        uuid id PK
+        varchar display_name
+    }
+
+    COURSES {
+        uuid id PK
+        varchar title
+        varchar assessment_type
+    }
+
+    COURSE_OFFERINGS {
+        uuid id PK
+        uuid course_id FK
+        uuid group_id FK
+        uuid instructor_id FK
+        varchar term
+    }
+
+    LESSONS {
+        uuid id PK
+        uuid offering_id FK
+        timestamptz starts_at
+        timestamptz ends_at
+        varchar room
+        varchar lesson_type
+    }
+
+    LESSON_CHANGES {
+        uuid id PK
+        uuid lesson_id FK
+        varchar kind
+        jsonb old_values
+        jsonb new_values
+        timestamptz changed_at
+    }
+
+    ENROLLMENTS {
+        uuid id PK
+        uuid student_id FK
+        uuid offering_id FK
+    }
+
+    GRADES {
+        uuid id PK
+        uuid enrollment_id FK
+        varchar kind
+        varchar value
+        timestamptz graded_at
+    }
+
+    EXAMS {
+        uuid id PK
+        uuid offering_id FK
+        timestamptz scheduled_at
+        varchar room
+        varchar exam_type
+    }
+
+    REQUEST_TYPES {
+        uuid id PK
+        varchar code UK
+        varchar title
+        text description
+        jsonb fields_schema
+        boolean comment_required
+        int comment_max_length
+    }
+
+    APPLICATIONS {
+        uuid id PK
+        uuid student_id FK
+        uuid type_id FK
+        varchar status
+        jsonb fields
+        text comment
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    APPLICATION_EVENTS {
+        uuid id PK
+        uuid application_id FK
+        varchar from_status
+        varchar to_status
+        text note
+        uuid actor_user_id FK
+        timestamptz created_at
+    }
+
+    NOTIFICATIONS {
+        uuid id PK
+        uuid student_id FK
+        varchar kind
+        varchar title
+        text body
+        varchar target_type
+        uuid target_id
+        timestamptz created_at
+        timestamptz read_at
+    }

@@ -1,0 +1,36 @@
+{
+	admin off
+}
+
+(puls_api) {
+	reverse_proxy api:8000
+}
+
+{$CADDY_ADDRESS::8080} {
+	encode zstd gzip
+	header {
+		Referrer-Policy "same-origin"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+	handle /api/* {
+		import puls_api
+	}
+	handle {
+		header Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self'"
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@html not path /assets/*
+		header @html Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+http://127.0.0.1:8081 {
+	handle /api/v1/health/live {
+		import puls_api
+	}
+}

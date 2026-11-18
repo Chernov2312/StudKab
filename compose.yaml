@@ -1,0 +1,90 @@
+name: puls
+
+x-backend: &backend
+  image: puls-api:local
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  environment: &backend-env
+    DATABASE_URL: "postgresql+asyncpg://puls:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/puls"
+    APP_ORIGIN: "${APP_ORIGIN:-http://localhost:8080}"
+    APP_ENV: "${APP_ENV:-development}"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: puls
+      POSTGRES_DB: puls
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
+      TZ: UTC
+    networks: [data]
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U puls -d puls"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+  migrate:
+    <<: *backend
+    networks: [data]
+    command: ["alembic", "upgrade", "head"]
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    networks: [data, proxy]
+    environment:
+      <<: *backend-env
+      FORWARDED_ALLOW_IPS: "*"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    image: puls-web:local
+    networks: [proxy]
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      CADDY_ADDRESS: ":8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  seed:
+    <<: *backend
+    networks: [data]
+    profiles: ["tools"]
+    command: ["python", "-m", "app.seed"]
+    healthcheck:
+      disable: true
+    environment:
+      <<: *backend-env
+      DEMO_ALINA_PASSWORD: "${DEMO_ALINA_PASSWORD:-}"
+      DEMO_MARK_PASSWORD: "${DEMO_MARK_PASSWORD:-}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  database:
+
+networks:
+  data:
+    internal: true
+  proxy:

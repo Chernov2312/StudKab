@@ -1,0 +1,27 @@
+x-production: &production
+  APP_ENV: production
+  APP_ORIGIN: "https://${PULS_DOMAIN:?set PULS_DOMAIN}"
+
+services:
+  migrate:
+    environment: *production
+  api:
+    environment: *production
+  seed:
+    environment: *production
+  web:
+    environment:
+      CADDY_ADDRESS: "${PULS_DOMAIN:?set PULS_DOMAIN}"
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
