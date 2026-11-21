@@ -12,6 +12,7 @@ export function NotificationsPage() {
   const query = useQuery({
     queryKey: ['notifications', unread, page],
     queryFn: ({ signal }) => api<Notifications>('/notifications?unread_only=' + unread + '&page=' + page, { signal }),
+    refetchInterval: 60_000,
   })
   const mark = useMutation({
     mutationFn: (id: string) => mutate('/notifications/' + encodeURIComponent(id) + '/read'),

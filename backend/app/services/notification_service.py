@@ -1,13 +1,37 @@
-from uuid import UUID
+from datetime import datetime, timedelta
+from uuid import UUID, uuid5
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.domain import utcnow
+from app.core.domain import MOSCOW, Assessment, NotificationKind, TargetType, utcnow
 from app.core.exceptions import ApiError
+from app.db.dao.exam_dao import ExamDAO
 from app.db.dao.notification_dao import NotificationDAO
 from app.schemas.common import Pagination, Target
 from app.schemas.notifications import MarkRead, NotificationItem, NotificationQuery, Notifications
 from app.services.student_service import StudentScope
+
+
+async def create_exam_reminders(db: AsyncSession, now: datetime) -> int:
+    async with db.begin():
+        due = await ExamDAO(db).upcoming_for_reminders(now, now + timedelta(hours=24))
+        rows: list[dict[str, object]] = []
+        for student_id, exam_id, course, scheduled_at, kind in due:
+            title = "Напоминание об экзамене" if kind == Assessment.EXAM else "Напоминание о зачёте"
+            when = scheduled_at.astimezone(MOSCOW).strftime("%d.%m.%Y в %H:%M")
+            rows.append(
+                {
+                    "id": uuid5(student_id, f"exam-reminder-24h:{exam_id}"),
+                    "student_id": student_id,
+                    "kind": NotificationKind.DEADLINE,
+                    "title": title,
+                    "body": f"{course} — {when} (МСК).",
+                    "target_type": TargetType.EXAM,
+                    "target_id": exam_id,
+                    "created_at": now,
+                }
+            )
+        return await NotificationDAO(db).insert_reminders(rows)
 
 
 async def list_notifications(

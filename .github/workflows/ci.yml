@@ -26,8 +26,8 @@ jobs:
           done
       - name: Validate Compose, build, migrate and seed
         run: |
-          docker compose config --quiet
-          PULS_DOMAIN=puls.example.test docker compose -f compose.yaml -f compose.prod.yaml config --quiet
+          docker compose --profile async config --quiet
+          PULS_DOMAIN=puls.example.test docker compose -f compose.yaml -f compose.prod.yaml --profile async config --quiet
           docker compose up --build -d --wait
           docker compose run --rm seed
           curl --fail --silent http://localhost:8080/api/v1/health/ready
@@ -39,6 +39,28 @@ jobs:
       - name: Browser scenarios
         working-directory: frontend
         run: npm run test:e2e
+      - name: Check scheduled exam reminders
+        run: |
+          docker compose --profile async up -d --wait redis worker beat
+          count_sql="SELECT count(*) FROM notifications WHERE kind = 'deadline'"
+          initial=$(docker compose exec -T db psql -v ON_ERROR_STOP=1 -U puls -d puls -tA -c "$count_sql")
+          expected=$((initial + 2))
+          docker compose exec -T db psql -v ON_ERROR_STOP=1 -U puls -d puls -c "
+            UPDATE exams SET scheduled_at = now() + interval '12 hours'
+            WHERE scheduled_at = (SELECT min(scheduled_at) FROM exams)
+          "
+          deadline=$((SECONDS + 100))
+          while (( SECONDS < deadline )); do
+            count=$(docker compose exec -T db psql -v ON_ERROR_STOP=1 -U puls -d puls -tA -c "$count_sql")
+            if [ "$count" = "$expected" ]; then
+              docker compose --profile async stop redis
+              curl --fail --silent http://localhost:8080/api/v1/health/ready
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose --profile async logs beat worker
+          exit 1
       - name: Upload browser report
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,4 +70,4 @@ jobs:
           if-no-files-found: ignore
       - name: Stop test services
         if: always()
-        run: docker compose down
+        run: docker compose --profile async down
