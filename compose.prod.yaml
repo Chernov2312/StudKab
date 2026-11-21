@@ -7,6 +7,8 @@ services:
     environment: *production
   api:
     environment: *production
+  worker:
+    environment: *production
   seed:
     environment: *production
   web:

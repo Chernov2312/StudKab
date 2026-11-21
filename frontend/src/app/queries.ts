@@ -7,6 +7,7 @@ export const sessionQuery = queryOptions({ queryKey: ['session'], queryFn: ({ si
 export const dashboardQuery = queryOptions({
   queryKey: ['dashboard'],
   queryFn: ({ signal }) => api<Dashboard>('/dashboard', { signal }),
+  refetchInterval: 60_000,
 })
 
 export const requestTypesQuery = queryOptions({

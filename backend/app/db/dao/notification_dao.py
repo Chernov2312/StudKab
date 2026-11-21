@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import Select, and_, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert
 
 from app.core.domain import DEMO_TERM, TargetType
 from app.db.dao.basedao import BaseDAO
@@ -9,6 +10,16 @@ from app.db.models import Application, Enrollment, Exam, Lesson, Notification, O
 
 
 class NotificationDAO(BaseDAO):
+    async def insert_reminders(self, rows: list[dict[str, object]]) -> int:
+        if not rows:
+            return 0
+        statement = (
+            insert(Notification)
+            .on_conflict_do_nothing(index_elements=[Notification.id])
+            .returning(Notification.id)
+        )
+        return len((await self.session.scalars(statement, rows)).all())
+
     @staticmethod
     def _owned(student_id: UUID, unread_only: bool) -> Select[tuple[Notification]]:
         statement = select(Notification).where(Notification.student_id == student_id)

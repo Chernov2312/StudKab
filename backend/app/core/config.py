@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://puls@localhost/puls"
+    celery_broker_url: str = "redis://localhost:6379/0"
     app_origin: str = "http://localhost:8080"
     app_env: Literal["development", "production"] = "development"
     session_ttl_seconds: int = Field(default=7 * 24 * 3600, ge=60)
